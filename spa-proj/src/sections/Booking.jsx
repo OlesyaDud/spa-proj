@@ -67,7 +67,7 @@ export default function Booking() {
       <div className="relative mt-10">
         <div className="mx-auto max-w-6xl rounded-3xl bg-white/95 p-8 md:p-12 ring-1 ring-slate-100 shadow-[0_18px_70px_-28px_rgba(139,92,246,0.35)]">
           <h3 className="text-center text-2xl md:text-3xl font-semibold text-slate-800">
-            Schedule Your Appointment
+            Schedule Your <span className="text-[#aa98cd]">Appointment</span>
           </h3>
 
           <div className="mt-8" />

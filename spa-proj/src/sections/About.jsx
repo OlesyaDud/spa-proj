@@ -20,7 +20,7 @@ export default function About() {
       {/* LEFT: copy */}
       <div className="max-w-3xl">
         <h2 className="text-5xl md:text-6xl font-semibold tracking-tight text-slate-800 font-serif leading-[1.05]">
-          Where Wellness <span className="text-violet-500">Meets</span> Luxury
+          Where Wellness <span className="text-[#aa98cd]">Meets</span> Luxury
         </h2>
 
         <p className="mt-6 text-lg md:text-xl leading-8 text-slate-600">
@@ -45,7 +45,7 @@ export default function About() {
               shadow-[0_18px_50px_-24px_rgba(139,92,246,0.25)]
             "
           >
-            <div className="text-4xl md:text-5xl font-semibold text-violet-500">
+            <div className="text-4xl md:text-5xl font-semibold text-[#aa98cd]">
               5+
             </div>
             <div className="mt-2 text-slate-500">Years of Excellence</div>
@@ -57,7 +57,7 @@ export default function About() {
               shadow-[0_18px_50px_-24px_rgba(139,92,246,0.25)]
             "
           >
-            <div className="text-4xl md:text-5xl font-semibold text-violet-500">
+            <div className="text-4xl md:text-5xl font-semibold text-[#aa98cd]">
               1000+
             </div>
             <div className="mt-2 text-slate-500">Happy Clients</div>

@@ -63,7 +63,7 @@ export default function Testimonials() {
     <Section id="testimonials">
       <div className="text-center max-w-3xl mx-auto">
         <h2 className="text-4xl md:text-5xl font-semibold tracking-tight text-slate-800">
-          What Our Clients <span className="text-violet-500">Say</span>
+          What Our Clients <span className="text-[#aa98cd]">Say</span>
         </h2>
         <p className="mt-3 text-slate-500">
           Don’t just take our word for it. Hear from those who’ve experienced

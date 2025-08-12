@@ -20,7 +20,7 @@ function ServiceMenu({ services, onPick, onClose }) {
         </div>
         <button
           onClick={onClose}
-          className="text-xs text-violet-700 hover:underline"
+          className="text-xs text-[#7c6f93]  hover:underline"
         >
           ⟵ Back to chat
         </button>
@@ -31,7 +31,7 @@ function ServiceMenu({ services, onPick, onClose }) {
           <button
             key={s.id}
             onClick={() => onPick(s)}
-            className="rounded-full border border-violet-200/70 bg-white px-3 py-2 text-sm text-violet-700 hover:bg-violet-50 transition"
+            className="rounded-full border border-violet-200/70 bg-white px-3 py-2 text-sm text-[#815dbd] hover:bg-violet-50 transition"
           >
             {s.name}
           </button>
@@ -50,7 +50,7 @@ function ServiceDetails({ service, onBack, onBook }) {
         </div>
         <button
           onClick={onBack}
-          className="text-xs text-violet-700 hover:underline"
+          className="text-xs text-[#7c6f93]  hover:underline"
         >
           ⟵ Back to services
         </button>
@@ -74,13 +74,13 @@ function ServiceDetails({ service, onBack, onBook }) {
       <div className="mt-5 flex gap-3">
         <button
           onClick={onBook}
-          className="rounded-xl bg-violet-600 px-4 py-2 text-white shadow hover:bg-violet-500"
+          className="rounded-xl bg-[#a08bc8] px-4 py-2 text-white shadow  hover:bg-[#aa98cd] "
         >
           Start Booking
         </button>
         <button
           onClick={onBack}
-          className="rounded-xl border border-violet-300 px-4 py-2 text-violet-700 hover:bg-violet-50"
+          className="rounded-xl border border-violet-300 px-4 py-2 text-[#7c6f93] hover:bg-violet-50"
         >
           Back
         </button>

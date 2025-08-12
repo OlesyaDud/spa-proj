@@ -37,7 +37,7 @@ export default function Services() {
       <div className="text-center max-w-3xl mx-auto">
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">
           Our{" "}
-          <span className="text-purple-400 font-serif">Signature Services</span>
+          <span className="text-[#aa98cd] font-serif">Signature Services</span>
         </h2>
         <p className="mt-3 text-gray-500">
           Discover our carefully curated selection of wellness treatments, each
@@ -79,7 +79,7 @@ export default function Services() {
                 {/* Duration & Price */}
                 <div className="mt-5 flex items-center justify-between text-sm text-gray-500">
                   <span>{s.duration} min</span>
-                  <span className="text-purple-400 font-medium">
+                  <span className="text-[#aa98cd] font-medium">
                     From ${s.priceFrom}
                   </span>
                 </div>
@@ -87,7 +87,7 @@ export default function Services() {
                 {/* Button */}
                 <button
                   onClick={() => scrollToId("booking")}
-                  className="mt-6 w-full rounded-xl border border-purple-200 py-2.5 text-sm font-medium text-purple-400 hover:bg-purple-50 transition-colors"
+                  className="mt-6 w-full rounded-xl border border-purple-200 py-2.5 text-sm font-medium text-[#aa98cd] hover:bg-purple-50 transition-colors"
                 >
                   Chat to Learn More
                 </button>

@@ -31,7 +31,7 @@ export default function SerenitySpaSite() {
               aria-hidden
               className="inline-block h-2.5 w-2.5 rounded-full bg-violet-500 shadow-[0_0_0_4px_rgba(167,139,250,0.15)]"
             /> */}
-            <span className="font-serif text-xl font-semibold tracking-tight">
+            <span className="font-serif text-xl font-semibold tracking-tight text-[#aa98cd]">
               Serenity Spa
             </span>
           </a>
@@ -63,9 +63,9 @@ export default function SerenitySpaSite() {
           <a
             href="#booking"
             className="
-              rounded-full bg-violet-500 px-4 py-2 text-sm font-medium text-white
+              rounded-full bg-[#a08bc8] px-4 py-2 text-sm font-medium text-white
               shadow-[0_14px_30px_-18px_rgba(139,92,246,0.6)]
-              hover:bg-violet-600 focus:outline-none focus:ring-2 focus:ring-violet-300
+              hover:bg-[#aa98cd] focus:outline-none focus:ring-2 focus:ring-violet-300
               transition
             "
           >

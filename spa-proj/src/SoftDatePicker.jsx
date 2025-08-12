@@ -94,7 +94,7 @@ export default function SoftDatePicker({
         onClick={() => setOpen((v) => !v)}
         className="
           w-full rounded-2xl border border-violet-100 bg-white/95
-          px-4 py-3 pr-12 text-left text-sm text-slate-700 placeholder-slate-400 shadow-sm
+          px-4 py-3 pr-2 text-left text-sm text-slate-700 placeholder-slate-400 shadow-sm
           focus:outline-none focus:border-violet-300 focus:ring focus:ring-violet-200/70
           flex items-center justify-between
         "
@@ -105,7 +105,7 @@ export default function SoftDatePicker({
         <span
           className="
             ml-2 inline-flex h-8 w-8 items-center justify-center rounded-lg
-            bg-violet-50 text-violet-500
+            bg-violet-50 text-violet-400
           "
         >
           <Calendar size={18} />
@@ -117,7 +117,7 @@ export default function SoftDatePicker({
         <div
           ref={popRef}
           className="
-            absolute right-0 top-full z-50 mt-2 w-80 rounded-2xl bg-white
+            absolute right-0 top-full z-50 mt-2 w-70 rounded-2xl bg-white
             border border-violet-100 ring-1 ring-violet-100 shadow-xl p-3
           "
         >

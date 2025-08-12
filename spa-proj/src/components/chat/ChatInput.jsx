@@ -44,7 +44,7 @@ export default function ChatInput({
       <button
         onClick={submit}
         disabled={disabled || busy}
-        className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50"
+        className="rounded-xl bg-[#a08bc8] px-4 py-2 text-sm font-medium text-white hover:bg-[#aa98cd] disabled:opacity-50"
       >
         {busy ? "…" : "Send"}
       </button>

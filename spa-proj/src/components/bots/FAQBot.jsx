@@ -69,7 +69,7 @@ export default function FAQBot() {
             onClick={() => handleSend(q)}
             className="
               rounded-full border border-violet-200 bg-violet-50
-              px-3 py-1.5 text-xs font-medium text-violet-700
+              px-3 py-1.5 text-xs font-medium text-[#7c6f93]
               hover:bg-violet-100 transition
             "
           >
@@ -95,10 +95,10 @@ export default function FAQBot() {
           onClick={() => handleSend()}
           aria-label="Send"
           className="
-            h-11 w-11 flex-shrink-0 rounded-full bg-violet-500 text-white
+            h-11 w-11 flex-shrink-0 rounded-full bg-[#a08bc8]  text-white
             flex items-center justify-center
             shadow-[0_12px_30px_-18px_rgba(139,92,246,0.6)]
-            hover:bg-violet-600 focus:outline-none focus:ring-2 focus:ring-violet-300 transition
+            hover:bg-[#aa98cd] focus:outline-none focus:ring-2 focus:ring-violet-300 transition
           "
         >
           <Send size={18} />

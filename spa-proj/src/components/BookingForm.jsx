@@ -39,8 +39,8 @@ export default function BookingForm({
 
   const wrapPad = compact ? "p-5 md:p-6" : "p-7 md:p-8";
   const buttonClass =
-    "rounded-2xl bg-violet-500 px-5 py-2.5 text-sm font-medium text-white " +
-    "shadow-[0_12px_30px_-18px_rgba(139,92,246,0.6)] hover:bg-violet-600 " +
+    "rounded-2xl bg-[#a08bc8] px-5 py-2.5 text-sm font-medium text-white " +
+    "shadow-[0_12px_30px_-18px_rgba(139,92,246,0.6)] hover:bg-[#aa98cd]  " +
     "focus:outline-none focus:ring-2 focus:ring-violet-300 transition";
 
   const serviceOptions = services.map((s) => ({ value: s.id, label: s.name }));

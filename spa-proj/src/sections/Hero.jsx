@@ -26,7 +26,7 @@ export default function Hero() {
         <div className="mt-6 flex flex-wrap justify-center gap-4">
           <button
             onClick={() => scrollToId("booking")}
-            className="rounded-xl bg-violet-500 px-6 py-3 text-base font-medium text-white shadow hover:bg-violet-600"
+            className="rounded-xl bg-[#a08bc8] px-6 py-3 text-base font-medium text-white shadow hover:bg-[#aa98cd]"
           >
             Book Appointment
           </button>

@@ -16,9 +16,9 @@ export default function ChatWidget() {
         aria-label={open ? "Close chat" : "Open chat"}
         className="
           pointer-events-auto fixed bottom-6 right-6
-          h-14 w-14 rounded-full bg-[#A78BFA] text-white
+          h-14 w-14 rounded-full bg-[#a08bc8] text-white
           shadow-[0_18px_40px_-15px_rgba(139,92,246,0.7)]
-          hover:bg-[#9A7DEB] transition flex items-center justify-center
+          hover:bg-[#aa98cd] transition flex items-center justify-center
         "
       >
         {open ? <X size={22} /> : <MessageCircle size={22} />}

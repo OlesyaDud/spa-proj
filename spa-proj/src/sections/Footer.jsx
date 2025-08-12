@@ -28,7 +28,7 @@ export default function Footer() {
           </p>
 
           {/* Socials */}
-          <div className="mt-5 flex space-x-4 text-violet-400">
+          <div className="mt-5 flex space-x-4  text-[#aa98cd]">
             <a
               href="#"
               aria-label="Instagram"
@@ -96,15 +96,15 @@ export default function Footer() {
           <h4 className="text-base font-semibold text-slate-800">Contact Us</h4>
           <ul className="mt-3 space-y-3 text-sm">
             <li className="flex items-start gap-2">
-              <HiOutlineLocationMarker className="mt-0.5 text-violet-400" />
+              <HiOutlineLocationMarker className="mt-0.5  text-[#aa98cd]" />
               <span>{biz ? biz.address : "Loading address…"}</span>
             </li>
             <li className="flex items-center gap-2">
-              <HiOutlinePhone className="text-violet-400" />
+              <HiOutlinePhone className=" text-[#aa98cd]" />
               <span>{biz ? biz.phone : "Loading phone…"}</span>
             </li>
             <li className="flex items-center gap-2">
-              <HiOutlineMail className="text-violet-400" />
+              <HiOutlineMail className=" text-[#aa98cd]" />
               <span>{biz ? biz.email : "Loading email…"}</span>
             </li>
           </ul>
@@ -127,7 +127,7 @@ export default function Footer() {
             />
             <button
               type="submit"
-              className="rounded-r-xl bg-violet-400 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 transition"
+              className="rounded-r-xl bg-[#a08bc8] px-4 py-2 text-sm font-medium text-white   hover:bg-[#aa98cd] transition"
             >
               Join
             </button>
