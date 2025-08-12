@@ -1,51 +1,59 @@
-// Menu of services used by the UI and the bots
-export const SERVICE_CATALOG = [
-  {
-    id: "massage",
-    name: "Signature Massage",
-    duration: 60,
-    priceFrom: 150,
-    description:
-      "Customized full-body massage using premium oils and techniques tailored to your needs.",
-  },
-  {
-    id: "facial",
-    name: "Rejuvenating Facials",
-    duration: 75,
-    priceFrom: 120,
-    description:
-      "Advanced skincare using organic products for glowing, youthful skin.",
-  },
-  {
-    id: "body-wrap",
-    name: "Detoxifying Body Wraps",
-    duration: 80,
-    priceFrom: 180,
-    description:
-      "Purifying treatments that cleanse, nourish, and restore your skin's natural radiance.",
-  },
-  {
-    id: "aroma",
-    name: "Aromatherapy Sessions",
-    duration: 60,
-    priceFrom: 110,
-    description:
-      "Therapeutic essential‑oil blends to balance your mind and enhance well‑being.",
-  },
-  {
-    id: "hot-stone",
-    name: "Hot Stone Therapy",
-    duration: 90,
-    priceFrom: 170,
-    description:
-      "Deep muscle relaxation using heated volcanic stones for ultimate stress relief.",
-  },
-  {
-    id: "couples",
-    name: "Couples Retreat",
-    duration: 120,
-    priceFrom: 350,
-    description:
-      "Intimate spa experience designed for two, including massage and private relaxation.",
-  },
-];
+import { supabase } from "../utils/supabaseClient";
+
+/** Just services (no aliases) */
+export async function fetchServices() {
+  const { data, error } = await supabase
+    .from("services")
+    .select("*")
+    .order("name");
+
+  if (error) {
+    console.error("[fetchServices] Error:", error);
+    return [];
+  }
+  return data;
+}
+
+/** Services + aliases merged: [{ id, name, ..., aliases: ["hot stone", ...] }] */
+export async function fetchServicesWithAliases() {
+  // query both tables
+  const [svcRes, aliasRes] = await Promise.all([
+    supabase.from("services").select("*"),
+    supabase.from("service_aliases").select("service_id, alias"),
+  ]);
+
+  if (svcRes.error) {
+    console.error("[fetchServicesWithAliases] services error:", svcRes.error);
+    return [];
+  }
+  if (aliasRes.error) {
+    console.error("[fetchServicesWithAliases] aliases error:", aliasRes.error);
+    // still return services (no aliases) if alias query fails
+    return svcRes.data.map((r) => ({
+      id: r.id,
+      name: r.name,
+      duration: r.duration,
+      priceFrom: Number(r.price_from),
+      description: r.description,
+      aliases: [],
+    }));
+  }
+
+  // group aliases by service_id
+  const byService = new Map();
+  for (const row of aliasRes.data) {
+    const list = byService.get(row.service_id) || [];
+    list.push(row.alias);
+    byService.set(row.service_id, list);
+  }
+
+  // merge
+  return svcRes.data.map((r) => ({
+    id: r.id,
+    name: r.name,
+    duration: r.duration,
+    priceFrom: Number(r.price_from),
+    description: r.description,
+    aliases: byService.get(r.id) || [],
+  }));
+}

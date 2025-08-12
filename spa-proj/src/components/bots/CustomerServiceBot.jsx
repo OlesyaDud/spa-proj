@@ -1,12 +1,13 @@
 // src/components/bots/CustomerServiceBot.jsx
 import { useEffect, useRef, useState, useCallback } from "react";
-import { BUSINESS_CONFIG } from "../../data/config.js";
-import { SERVICE_CATALOG } from "../../data/services.js";
+import { fetchBusinessConfig } from "../../data/config.js";
+import { fetchServices } from "../../data/services.js";
 import { detectIntent, formatDate } from "../../bot/utils.js";
 import MessageList from "../chat/MessageList.jsx";
 import BookingForm from "../BookingForm.jsx";
 import ChatInput from "../chat/ChatInput.jsx";
 import { askAssistant } from "../../utils/aiChat.js";
+import { saveBooking } from "../../utils/saveBooking.js";
 
 /* ----------------------------- UI pieces ----------------------------- */
 
@@ -96,7 +97,7 @@ const isDetailsQ = (t = "") =>
   /\b(details|what is|tell me more|include|about|explain|describe)\b/i.test(t);
 const isBookQ = (t = "") => /\b(book|schedule|reserve|appointment)\b/i.test(t);
 
-// NEW: treat anything that *reads like a question* as a question
+// treat anything that reads like a question as a question
 const isQuestion = (t = "") =>
   /\?|^\s*(what|how|why|tell me|explain|describe|details|about|include)\b/i.test(
     String(t)
@@ -109,6 +110,7 @@ const slug = (s = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
+// simple alias map (could be enriched with DB aliases too)
 const SERVICE_ALIASES = {
   "hot stone": "hot stone therapy",
   "hot stones": "hot stone therapy",
@@ -124,13 +126,13 @@ const SERVICE_ALIASES = {
   couples: "couples retreat",
 };
 
-function findServiceFromText(text) {
+function findServiceFromText(text, services) {
   const t = slug(text);
 
   // alias hit
   for (const [alias, target] of Object.entries(SERVICE_ALIASES)) {
     if (t.includes(alias)) {
-      const svc = SERVICE_CATALOG.find(
+      const svc = services.find(
         (s) => slug(s.name) === slug(target) || slug(s.id) === slug(target)
       );
       if (svc) return svc;
@@ -138,7 +140,7 @@ function findServiceFromText(text) {
   }
 
   // direct contains
-  for (const s of SERVICE_CATALOG) {
+  for (const s of services) {
     const id = slug(s.id);
     const nm = slug(s.name);
     if (t.includes(id) || t.includes(nm)) return s;
@@ -146,7 +148,7 @@ function findServiceFromText(text) {
 
   // token overlap fallback
   let best = null;
-  for (const s of SERVICE_CATALOG) {
+  for (const s of services) {
     const tokens = slug(s.name).split(" ").filter(Boolean);
     const score = tokens.reduce(
       (acc, tok) => acc + (t.includes(tok) ? 1 : 0),
@@ -172,13 +174,43 @@ export default function CustomerServiceBot() {
   ]);
   const [pending, setPending] = useState(false);
 
+  // services from Supabase
+  const [services, setServices] = useState([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+
+  // business config from Supabase
+  const [biz, setBiz] = useState(null);
+
   // Views / state
   const [showServiceMenu, setShowServiceMenu] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [showBooking, setShowBooking] = useState(false);
-  const [currentService, setCurrentService] = useState(null); // conversational context
+  const [currentService, setCurrentService] = useState(null);
 
   const scrollerRef = useRef(null);
+
+  // Fetch services + business config on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await fetchServices();
+        const mapped = (rows || []).map((r) => ({
+          id: r.id,
+          name: r.name,
+          duration: r.duration,
+          priceFrom: Number(r.price_from),
+          description: r.description,
+        }));
+        setServices(mapped);
+      } catch (e) {
+        console.error("Failed to load services:", e);
+      } finally {
+        setLoadingServices(false);
+      }
+    })();
+
+    fetchBusinessConfig().then(setBiz).catch(console.error);
+  }, []);
 
   // Smooth auto-scroll whenever content grows
   useEffect(() => {
@@ -241,7 +273,7 @@ export default function CustomerServiceBot() {
 
   const openDetails = useCallback((svc) => {
     setSelectedService(svc);
-    setCurrentService(svc); // remember context for follow-ups
+    setCurrentService(svc);
   }, []);
 
   const backToServices = useCallback(() => {
@@ -272,13 +304,12 @@ export default function CustomerServiceBot() {
       append({ role: "user", content: text });
 
       const intent = detectIntent(text);
-      const maybeService = findServiceFromText(text);
+      const maybeService = findServiceFromText(text, services);
       const question = isQuestion(text);
 
       // --- If it's a question, prefer a textual answer and close UI overlays ---
       if (question) {
         if (maybeService) {
-          // Question about a specific service -> give a text summary, no cards
           setShowServiceMenu(false);
           setSelectedService(null);
           setShowBooking(false);
@@ -293,7 +324,6 @@ export default function CustomerServiceBot() {
           return;
         }
 
-        // Question but no clear service -> close menus and ask LLM
         setShowServiceMenu(false);
         setSelectedService(null);
 
@@ -337,7 +367,6 @@ ${
 
       // --- Non-question flows (menus/cards as before) ---
 
-      // Named a service (statement) -> open the details card
       if (maybeService) {
         setShowServiceMenu(false);
         setSelectedService(maybeService);
@@ -360,19 +389,26 @@ ${
       if (intent === "hours") {
         append({
           role: "bot",
-          content: `We're open Mon–Fri ${BUSINESS_CONFIG.hours.mon_fri}, Sat ${BUSINESS_CONFIG.hours.sat}. Closed Sundays.`,
+          content: biz
+            ? `We're open Mon–Fri ${biz.hours.mon_fri}, Sat ${biz.hours.sat}. Closed Sundays.`
+            : "Our hours are loading…",
         });
         return;
       }
       if (intent === "location") {
         append({
           role: "bot",
-          content: `We're at ${BUSINESS_CONFIG.address}.`,
+          content: biz ? `We're at ${biz.address}.` : "Our address is loading…",
         });
         return;
       }
       if (intent === "policy") {
-        append({ role: "bot", content: BUSINESS_CONFIG.policies.cancellation });
+        append({
+          role: "bot",
+          content:
+            biz?.policies?.cancellation ||
+            "Our cancellation policy is loading…",
+        });
         return;
       }
       if (intent === "book") {
@@ -381,13 +417,19 @@ ${
         return;
       }
 
-      // explicit request for services list
       if (/services?/.test(text.toLowerCase())) {
-        openServiceMenu();
+        if (!loadingServices && services.length > 0) {
+          openServiceMenu();
+        } else {
+          append({
+            role: "bot",
+            content:
+              "I’m still loading our services list—try again in a moment.",
+          });
+        }
         return;
       }
 
-      // follow-ups about the current service (non-question wording)
       if (currentService) {
         if (isPriceQ(text)) {
           append({
@@ -414,7 +456,6 @@ ${
         }
       }
 
-      // default LLM fallback (non-question but unrecognized)
       setShowServiceMenu(false);
       setSelectedService(null);
 
@@ -456,6 +497,9 @@ ${
     [
       messages,
       pending,
+      services,
+      loadingServices,
+      biz,
       currentService,
       backToChat,
       openServiceMenu,
@@ -463,15 +507,37 @@ ${
     ]
   );
 
-  const onSubmitBooking = (payload) => {
+  // ---- UPDATED: now async and saves to Google Sheets with transcript ----
+  const onSubmitBooking = async (payload) => {
     const s =
-      selectedService ||
-      SERVICE_CATALOG.find((x) => x.id === payload.service) ||
-      null;
+      selectedService || services.find((x) => x.id === payload.service) || null;
 
     const when = payload.date
       ? formatDate(new Date(payload.date))
       : "(date TBD)";
+
+    // Build a short transcript (last ~8 turns)
+    const transcript = messages
+      .slice(-8)
+      .map((m) => `${m.role === "bot" ? "assistant" : "user"}: ${m.content}`)
+      .join(" | ");
+
+    // Try to save the booking (Google Apps Script)
+    try {
+      await saveBooking({
+        serviceId: s?.id || payload.service,
+        serviceName: s?.name || payload.service,
+        date: payload.date || "",
+        name: payload.name || "",
+        email: payload.email || "",
+        phone: payload.phone || "",
+        notes: payload.notes || "",
+        transcript, // short chat transcript
+        source: "chatbot",
+      });
+    } catch (err) {
+      console.error("saveBooking failed:", err);
+    }
 
     append({
       role: "bot",
@@ -501,7 +567,7 @@ ${
         {showServiceMenu && !selectedService && (
           <div className="mt-3">
             <ServiceMenu
-              services={SERVICE_CATALOG}
+              services={services}
               onPick={openDetails}
               onClose={closeServiceMenu}
             />
@@ -548,7 +614,13 @@ ${
               </button>
             </div>
           </div>
-          <BookingForm onSubmit={onSubmitBooking} />
+
+          {/* Pass lockedService so the picker is hidden/locked */}
+          <BookingForm
+            onSubmit={onSubmitBooking}
+            services={services}
+            lockedService={selectedService}
+          />
         </div>
       )}
 

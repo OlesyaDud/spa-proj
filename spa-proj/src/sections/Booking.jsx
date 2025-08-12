@@ -1,34 +1,62 @@
-import React, { useState } from "react";
+// src/sections/Booking.jsx
+import React, { useEffect, useState } from "react";
 import Section from "./Section.jsx";
 import BookingForm from "../components/BookingForm.jsx";
-import { SERVICE_CATALOG } from "../data/services.js";
+import { fetchServices } from "../data/services.js";
 import { saveBooking } from "../utils/saveBooking.js";
 
 export default function Booking() {
-  const [status, setStatus] = useState({ type: "idle", text: "" });
+  const [services, setServices] = useState([]);
+  const [loadingServices, setLoadingServices] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // Load services from Supabase
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await fetchServices();
+        const mapped = rows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          duration: r.duration,
+          priceFrom: Number(r.price_from),
+          description: r.description,
+        }));
+        setServices(mapped);
+      } catch (e) {
+        console.error("Failed to load services:", e);
+      } finally {
+        setLoadingServices(false);
+      }
+    })();
+  }, []);
+
   const handleSubmit = async (payload) => {
-    const s = SERVICE_CATALOG.find((x) => x.id === payload.service);
-    const toSend = { ...payload, serviceName: s?.name || payload.service };
+    // payload.service = selected service id
+    const svc = services.find((x) => x.id === payload.service);
+
+    // Shape exactly what your Apps Script expects:
+    // [Timestamp (server), serviceId, serviceName, date, name, email, phone, notes, transcript, source]
+    const toSend = {
+      serviceId: svc?.id || payload.service,
+      serviceName: svc?.name || payload.service,
+      date: payload.date || "",
+      name: payload.name || "",
+      email: payload.email || "",
+      phone: payload.phone || "",
+      notes: payload.notes || "",
+      transcript: "", // no chat history on the page form
+      source: "webform",
+    };
 
     setSubmitting(true);
-    setStatus({ type: "idle", text: "" });
-
     try {
       const ok = await saveBooking(toSend);
-      if (!ok) throw new Error("Save failed");
-
-      setStatus({
-        type: "ok",
-        text: "Thanks! Your request was received — we’ll be in touch shortly.",
-      });
+      console.log("[Booking] saveBooking result:", ok);
+      // No UI banner—silent success/failure. You can add analytics or
+      // reset the form via a ref if you want.
     } catch (err) {
-      console.error(err);
-      setStatus({
-        type: "error",
-        text: "Sorry, we couldn’t save your request. Please try again.",
-      });
+      console.error("[Booking] saveBooking error:", err);
     } finally {
       setSubmitting(false);
     }
@@ -44,20 +72,11 @@ export default function Booking() {
 
           <div className="mt-8" />
 
-          <BookingForm onSubmit={handleSubmit} />
-
-          {/* Inline status message (no alert) */}
-          {status.text && (
-            <div
-              className={`mt-4 rounded-2xl px-4 py-3 text-sm ring-1 ${
-                status.type === "ok"
-                  ? "bg-violet-50 text-violet-700 ring-violet-200"
-                  : "bg-rose-50 text-rose-700 ring-rose-200"
-              }`}
-            >
-              {status.text}
-            </div>
-          )}
+          <BookingForm
+            onSubmit={handleSubmit}
+            services={services}
+            disabled={submitting || loadingServices}
+          />
         </div>
       </div>
     </Section>

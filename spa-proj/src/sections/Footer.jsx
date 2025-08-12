@@ -1,6 +1,7 @@
-import React from "react";
+// src/sections/Footer.jsx
+import React, { useEffect, useState } from "react";
 import Section, { scrollToId } from "./Section.jsx";
-import { BUSINESS_CONFIG } from "../data/config.js";
+import { fetchBusinessConfig } from "../data/config.js";
 import { FaInstagram, FaFacebookF, FaTwitter } from "react-icons/fa";
 import {
   HiOutlineLocationMarker,
@@ -9,6 +10,12 @@ import {
 } from "react-icons/hi";
 
 export default function Footer() {
+  const [biz, setBiz] = useState(null);
+
+  useEffect(() => {
+    fetchBusinessConfig().then(setBiz).catch(console.error);
+  }, []);
+
   return (
     <footer className="bg-slate-50 text-slate-600">
       <Section className="grid gap-12 md:grid-cols-4">
@@ -90,15 +97,15 @@ export default function Footer() {
           <ul className="mt-3 space-y-3 text-sm">
             <li className="flex items-start gap-2">
               <HiOutlineLocationMarker className="mt-0.5 text-violet-400" />
-              <span>{BUSINESS_CONFIG.address}</span>
+              <span>{biz ? biz.address : "Loading address…"}</span>
             </li>
             <li className="flex items-center gap-2">
               <HiOutlinePhone className="text-violet-400" />
-              <span>{BUSINESS_CONFIG.phone}</span>
+              <span>{biz ? biz.phone : "Loading phone…"}</span>
             </li>
             <li className="flex items-center gap-2">
               <HiOutlineMail className="text-violet-400" />
-              <span>{BUSINESS_CONFIG.email}</span>
+              <span>{biz ? biz.email : "Loading email…"}</span>
             </li>
           </ul>
         </div>

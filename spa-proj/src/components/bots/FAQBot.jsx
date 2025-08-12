@@ -1,5 +1,6 @@
+// src/components/bots/FAQBot.jsx
 import React, { useMemo, useState } from "react";
-import { matchKB } from "../../bot/utils.js";
+import { tryKBAnswer } from "../../bot/utils.js";
 import MessageList from "../chat/MessageList.jsx";
 import { Send } from "lucide-react";
 
@@ -21,9 +22,10 @@ export default function FAQBot() {
     setText("");
     await new Promise((r) => setTimeout(r, 250));
 
-    const kb = matchKB(value);
+    // Use the async KB lookup (services + business info from Supabase)
+    const kb = await tryKBAnswer(value);
     const response =
-      kb ||
+      kb ??
       "I couldn't find that in my notes. Try asking about hours, location, services & pricing, or our cancellation policy.";
     setMessages((m) => [...m, { role: "bot", content: response }]);
   };

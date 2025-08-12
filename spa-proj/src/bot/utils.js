@@ -1,21 +1,36 @@
-// Bot helpers: date formatting, KB matcher, and a tiny regex-based intent detector
-import { KNOWLEDGE_BASE } from "./kb.js";
+// src/bot/utils.js
 
+import {
+  matchKB as kbGeneral,
+  matchKBService as kbService,
+} from "../bot/kb.js";
+
+/** Format a Date into a friendly short string */
 export const formatDate = (d) =>
   new Intl.DateTimeFormat(undefined, {
     weekday: "short",
     month: "short",
     day: "numeric",
-  }).format(d);
+  }).format(d instanceof Date ? d : new Date(d));
 
-export const matchKB = (message) => {
-  const msg = message.toLowerCase();
-  for (const entry of KNOWLEDGE_BASE)
-    if (entry.q.some((kw) => msg.includes(kw))) return entry.a();
+/**
+ * Try to answer using the knowledge base (services first, then general info).
+ * Returns a string answer or null if no match.
+ * NOTE: async — callers must `await tryKBAnswer(...)`.
+ */
+export async function tryKBAnswer(message) {
+  // Service-specific (uses aliases + names from DB)
+  const svc = await kbService(message);
+  if (svc) return svc;
+
+  // General business info (hours, address, policies, etc.)
+  const gen = await kbGeneral(message);
+  if (gen) return gen;
+
   return null;
-};
+}
 
-// src/bot/utils.js
+/** Tiny regex-based intent detector used to steer the chat flow */
 export function detectIntent(input = "") {
   const s = String(input).toLowerCase();
 
