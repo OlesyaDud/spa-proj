@@ -20,7 +20,7 @@ function ServiceMenu({ services, onPick, onClose }) {
         </div>
         <button
           onClick={onClose}
-          className="text-xs text-[#7c6f93]  hover:underline"
+          className="text-xs text-[#7c6f93] hover:underline"
         >
           ⟵ Back to chat
         </button>
@@ -50,7 +50,7 @@ function ServiceDetails({ service, onBack, onBook }) {
         </div>
         <button
           onClick={onBack}
-          className="text-xs text-[#7c6f93]  hover:underline"
+          className="text-xs text-[#7c6f93] hover:underline"
         >
           ⟵ Back to services
         </button>
@@ -74,7 +74,7 @@ function ServiceDetails({ service, onBack, onBook }) {
       <div className="mt-5 flex gap-3">
         <button
           onClick={onBook}
-          className="rounded-xl bg-[#a08bc8] px-4 py-2 text-white shadow  hover:bg-[#aa98cd] "
+          className="rounded-xl bg-[#a08bc8] px-4 py-2 text-white shadow hover:bg-[#aa98cd]"
         >
           Start Booking
         </button>
@@ -97,7 +97,6 @@ const isDetailsQ = (t = "") =>
   /\b(details|what is|tell me more|include|about|explain|describe)\b/i.test(t);
 const isBookQ = (t = "") => /\b(book|schedule|reserve|appointment)\b/i.test(t);
 
-// treat anything that reads like a question as a question
 const isQuestion = (t = "") =>
   /\?|^\s*(what|how|why|tell me|explain|describe|details|about|include)\b/i.test(
     String(t)
@@ -110,7 +109,6 @@ const slug = (s = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
-// simple alias map (could be enriched with DB aliases too)
 const SERVICE_ALIASES = {
   "hot stone": "hot stone therapy",
   "hot stones": "hot stone therapy",
@@ -129,7 +127,6 @@ const SERVICE_ALIASES = {
 function findServiceFromText(text, services) {
   const t = slug(text);
 
-  // alias hit
   for (const [alias, target] of Object.entries(SERVICE_ALIASES)) {
     if (t.includes(alias)) {
       const svc = services.find(
@@ -139,14 +136,12 @@ function findServiceFromText(text, services) {
     }
   }
 
-  // direct contains
   for (const s of services) {
     const id = slug(s.id);
     const nm = slug(s.name);
     if (t.includes(id) || t.includes(nm)) return s;
   }
 
-  // token overlap fallback
   let best = null;
   for (const s of services) {
     const tokens = slug(s.name).split(" ").filter(Boolean);
@@ -162,6 +157,40 @@ function findServiceFromText(text, services) {
 const summarizeService = (s) =>
   `${s.name}: ${s.description} (~${s.duration} min, from $${s.priceFrom}).`;
 
+/* ---------- helpers for business_config answers (hours/location/policy) --- */
+
+function answerHours(text, biz) {
+  if (!biz?.hours) return null;
+  const h = biz.hours || {};
+  const monFri = h.mon_fri || h.monFri || h.weekdays;
+  const sat = h.sat || h.saturday;
+  const sun = h.sun || h.sunday || "Closed";
+
+  if (/weekend/i.test(text)) {
+    return `Weekend hours: Sat ${sat || "—"}, Sun ${sun}.`;
+  }
+  if (/\bsat(urday)?\b/i.test(text)) {
+    return `Saturday hours: ${sat || "—"}.`;
+  }
+  if (/\bsun(day)?\b/i.test(text)) {
+    return `Sunday: ${sun}.`;
+  }
+  return `We're open Mon–Fri ${monFri || "—"}, Sat ${
+    sat || "—"
+  }. Closed Sundays.`;
+}
+
+function answerLocation(biz) {
+  return biz?.address ? `We're at ${biz.address}.` : null;
+}
+
+function answerPolicy(biz) {
+  const c = biz?.policies?.cancellation;
+  if (c) return c;
+  // friendly fallback
+  return "Please provide 24 hours notice to cancel or reschedule.";
+}
+
 /* ----------------------------- Main Bot ------------------------------ */
 
 export default function CustomerServiceBot() {
@@ -174,14 +203,11 @@ export default function CustomerServiceBot() {
   ]);
   const [pending, setPending] = useState(false);
 
-  // services from Supabase
+  const [conversationId, setConversationId] = useState(null);
   const [services, setServices] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
-
-  // business config from Supabase
   const [biz, setBiz] = useState(null);
 
-  // Views / state
   const [showServiceMenu, setShowServiceMenu] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [showBooking, setShowBooking] = useState(false);
@@ -189,7 +215,6 @@ export default function CustomerServiceBot() {
 
   const scrollerRef = useRef(null);
 
-  // Fetch services + business config on mount
   useEffect(() => {
     (async () => {
       try {
@@ -212,7 +237,6 @@ export default function CustomerServiceBot() {
     fetchBusinessConfig().then(setBiz).catch(console.error);
   }, []);
 
-  // Smooth auto-scroll whenever content grows
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -235,7 +259,6 @@ export default function CustomerServiceBot() {
     });
   }, []);
 
-  // Esc closes booking
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape" && showBooking) backToChat();
@@ -257,7 +280,7 @@ export default function CustomerServiceBot() {
     }));
 
   const openServiceMenu = useCallback(() => {
-    setCurrentService(null); // browsing resets context
+    setCurrentService(null);
     setSelectedService(null);
     setShowServiceMenu(true);
   }, []);
@@ -290,46 +313,8 @@ export default function CustomerServiceBot() {
     });
   }, []);
 
-  const handleSend = useCallback(
-    async (raw) => {
-      const text = String(raw || "").trim();
-      if (!text || pending) return;
-
-      // quick escape to main chat
-      if (/(^|\s)(back|close|exit|main menu|cancel)($|\s)/i.test(text)) {
-        backToChat();
-        return;
-      }
-
-      append({ role: "user", content: text });
-
-      const intent = detectIntent(text);
-      const maybeService = findServiceFromText(text, services);
-      const question = isQuestion(text);
-
-      // --- If it's a question, prefer a textual answer and close UI overlays ---
-      if (question) {
-        if (maybeService) {
-          setShowServiceMenu(false);
-          setSelectedService(null);
-          setShowBooking(false);
-          setCurrentService(maybeService);
-
-          append({
-            role: "bot",
-            content:
-              summarizeService(maybeService) +
-              " Would you like to book it or see the service card?",
-          });
-          return;
-        }
-
-        setShowServiceMenu(false);
-        setSelectedService(null);
-
-        setPending(true);
-        try {
-          const system = `You are a friendly spa assistant. Be concise and helpful.
+  const buildSystemPrompt = useCallback(() => {
+    return `You are a friendly spa assistant. Be concise and helpful.
 Only offer the services menu if the user explicitly asks for "services".
 If a current service is provided, use it to answer follow-ups directly.
 
@@ -342,31 +327,112 @@ ${
 - price_from: $${currentService.priceFrom}`
     : ""
 }`;
-          const history = [...toAI(messages), { role: "user", content: text }];
-          const ai = await askAssistant(history, system);
-          const content =
-            (typeof ai === "string" && ai) ||
-            ai?.content ||
-            ai?.message ||
-            ai?.text ||
-            "Sorry, I didn’t catch that. Could you rephrase?";
+  }, [currentService]);
 
-          append({ role: "bot", content: String(content).trim() });
-        } catch (e) {
-          console.error(e);
-          append({
-            role: "bot",
-            content:
-              "Sorry, I had trouble answering that just now. Please try again.",
+  const callAI = useCallback(
+    async (userText) => {
+      setPending(true);
+      try {
+        const history = [
+          ...toAI(messages),
+          { role: "user", content: userText },
+        ];
+        const system = buildSystemPrompt();
+
+        let res;
+        try {
+          res = await askAssistant(history, system, {
+            topK: 8,
+            threshold: 0.55,
           });
-        } finally {
-          setPending(false);
+        } catch {
+          res = await askAssistant(history, system, conversationId);
         }
+
+        const reply = res?.reply ?? res; // support both shapes (utils returning {reply} or raw)
+        const content =
+          reply?.content ||
+          reply?.message ||
+          reply?.text ||
+          (typeof reply === "string" ? reply : "");
+
+        if (res?.conversation_id && res.conversation_id !== conversationId) {
+          setConversationId(res.conversation_id);
+        }
+
+        append({ role: "bot", content: String(content || "…").trim() });
+
+        // If you kept citations, show them; else they won’t appear.
+        if (Array.isArray(res?.citations) && res.citations.length) {
+          const tips = res.citations
+            .map(
+              (c) =>
+                `• ${c.title || c.slug || "kb"} (${(c.similarity * 100).toFixed(
+                  0
+                )}% match)`
+            )
+            .join("\n");
+          append({ role: "bot", content: `_Sources:_\n${tips}` });
+        }
+      } catch (e) {
+        console.error(e);
+        append({
+          role: "bot",
+          content:
+            "Sorry, I had trouble answering that just now. Please try again.",
+        });
+      } finally {
+        setPending(false);
+      }
+    },
+    [messages, conversationId, buildSystemPrompt]
+  );
+
+  /* ------------------------ THE IMPORTANT CHANGE -----------------------
+     Handle specific intents from business_config BEFORE the generic
+     "question → AI" branch. This prevents hours/location questions from
+     skipping your DB answers.
+  --------------------------------------------------------------------- */
+
+  const handleSend = useCallback(
+    async (raw) => {
+      const text = String(raw || "").trim();
+      if (!text || pending) return;
+
+      if (/(^|\s)(back|close|exit|main menu|cancel)($|\s)/i.test(text)) {
+        backToChat();
         return;
       }
 
-      // --- Non-question flows (menus/cards as before) ---
+      append({ role: "user", content: text });
 
+      const intent = detectIntent(text);
+      const maybeService = findServiceFromText(text, services);
+
+      // 1) PRIORITIZE business_config intents
+      if (intent === "hours") {
+        const ans = answerHours(text, biz);
+        if (ans) {
+          append({ role: "bot", content: ans });
+          return;
+        }
+      }
+      if (intent === "location") {
+        const ans = answerLocation(biz);
+        if (ans) {
+          append({ role: "bot", content: ans });
+          return;
+        }
+      }
+      if (intent === "policy") {
+        const ans = answerPolicy(biz);
+        if (ans) {
+          append({ role: "bot", content: ans });
+          return;
+        }
+      }
+
+      // 2) Service-specific flows
       if (maybeService) {
         setShowServiceMenu(false);
         setSelectedService(maybeService);
@@ -378,36 +444,21 @@ ${
         return;
       }
 
+      // 3) Generic Q&A → AI/RAG
+      const question = isQuestion(text);
+      if (question) {
+        setShowServiceMenu(false);
+        setSelectedService(null);
+        await callAI(text);
+        return;
+      }
+
+      // 4) Non-question small intents
       if (intent === "greeting") {
         append({
           role: "bot",
           content:
             "Welcome! I can show services, explain pricing, or start a booking — what would you like?",
-        });
-        return;
-      }
-      if (intent === "hours") {
-        append({
-          role: "bot",
-          content: biz
-            ? `We're open Mon–Fri ${biz.hours.mon_fri}, Sat ${biz.hours.sat}. Closed Sundays.`
-            : "Our hours are loading…",
-        });
-        return;
-      }
-      if (intent === "location") {
-        append({
-          role: "bot",
-          content: biz ? `We're at ${biz.address}.` : "Our address is loading…",
-        });
-        return;
-      }
-      if (intent === "policy") {
-        append({
-          role: "bot",
-          content:
-            biz?.policies?.cancellation ||
-            "Our cancellation policy is loading…",
         });
         return;
       }
@@ -456,43 +507,10 @@ ${
         }
       }
 
+      // Fallback to AI
       setShowServiceMenu(false);
       setSelectedService(null);
-
-      setPending(true);
-      try {
-        const system = `You are a friendly spa assistant. Be concise and helpful.
-Only offer the services menu if the user explicitly asks for "services".
-If a current service is provided, use it to answer follow-ups directly.
-
-${
-  currentService
-    ? `Current service context:
-- name: ${currentService.name}
-- description: ${currentService.description}
-- duration: ${currentService.duration} minutes
-- price_from: $${currentService.priceFrom}`
-    : ""
-}`;
-        const history = [...toAI(messages), { role: "user", content: text }];
-        const ai = await askAssistant(history, system);
-        const content =
-          (typeof ai === "string" && ai) ||
-          ai?.content ||
-          ai?.message ||
-          ai?.text ||
-          "Sorry, I didn’t catch that. Could you rephrase?";
-        append({ role: "bot", content: String(content).trim() });
-      } catch (e) {
-        console.error(e);
-        append({
-          role: "bot",
-          content:
-            "Sorry, I had trouble answering that just now. Please try again.",
-        });
-      } finally {
-        setPending(false);
-      }
+      await callAI(text);
     },
     [
       messages,
@@ -504,10 +522,11 @@ ${
       backToChat,
       openServiceMenu,
       startBooking,
+      callAI,
     ]
   );
 
-  // ---- UPDATED: now async and saves to Google Sheets with transcript ----
+  // ---- Booking submission ----
   const onSubmitBooking = async (payload) => {
     const s =
       selectedService || services.find((x) => x.id === payload.service) || null;
@@ -516,13 +535,11 @@ ${
       ? formatDate(new Date(payload.date))
       : "(date TBD)";
 
-    // Build a short transcript (last ~8 turns)
     const transcript = messages
       .slice(-8)
       .map((m) => `${m.role === "bot" ? "assistant" : "user"}: ${m.content}`)
       .join(" | ");
 
-    // Try to save the booking (Google Apps Script)
     try {
       await saveBooking({
         serviceId: s?.id || payload.service,
@@ -532,7 +549,7 @@ ${
         email: payload.email || "",
         phone: payload.phone || "",
         notes: payload.notes || "",
-        transcript, // short chat transcript
+        transcript,
         source: "chatbot",
       });
     } catch (err) {
@@ -556,14 +573,12 @@ ${
 
   return (
     <div className="h-full flex flex-col gap-3">
-      {/* Scrollable messages */}
       <div
         ref={scrollerRef}
         className="flex-1 overflow-y-auto rounded-2xl bg-white/80 p-3 ring-1 ring-violet-100"
       >
         <MessageList items={messages} />
 
-        {/* Menus / Details */}
         {showServiceMenu && !selectedService && (
           <div className="mt-3">
             <ServiceMenu
@@ -591,7 +606,6 @@ ${
         )}
       </div>
 
-      {/* Booking form with navigation controls */}
       {showBooking && (
         <div className="rounded-2xl bg-white/95 p-4 ring-1 ring-violet-100 shadow-[0_12px_30px_-18px_rgba(139,92,246,0.25)]">
           <div className="mb-2 flex items-center justify-between">
@@ -615,7 +629,6 @@ ${
             </div>
           </div>
 
-          {/* Pass lockedService so the picker is hidden/locked */}
           <BookingForm
             onSubmit={onSubmitBooking}
             services={services}
@@ -624,7 +637,6 @@ ${
         </div>
       )}
 
-      {/* Input */}
       <div className="flex-shrink-0">
         <ChatInput
           onSend={handleSend}

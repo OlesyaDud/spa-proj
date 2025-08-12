@@ -1,20 +1,16 @@
 // src/utils/aiChat.js
 const FUNCTION_URL = import.meta.env.VITE_FUNCTION_URL;
 
-// normalize content to a plain string (covers weird shapes)
 function normalizeContent(reply) {
   if (!reply) return "";
   const c = reply.content;
-
   if (typeof c === "string") return c;
 
-  // if a model ever returns array/parts, squeeze out text
   if (Array.isArray(c)) {
-    const text = c
+    return c
       .map((part) => {
         if (!part) return "";
         if (typeof part === "string") return part;
-        // common shapes: { type: "text", text: "..." } or { text: { value: "..." } }
         if (part.type === "text" && typeof part.text === "string")
           return part.text;
         if (part.text && typeof part.text.value === "string")
@@ -23,20 +19,26 @@ function normalizeContent(reply) {
       })
       .join("\n")
       .trim();
-    return text;
   }
 
   if (c && typeof c === "object" && typeof c.text === "string") return c.text;
-
   return "";
 }
 
-export async function askAssistant(messages, system) {
+export async function askAssistant(messages, system, options = {}) {
+  const body = {
+    messages,
+    system,
+    // Gentler retrieval by default; override per-call if needed
+    rag_top_k: options.topK ?? 8,
+    rag_threshold: options.threshold ?? 0.55,
+  };
+
   const res = await fetch(FUNCTION_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     cache: "no-store",
-    body: JSON.stringify({ messages, system }),
+    body: JSON.stringify(body),
   });
 
   let data;
@@ -53,10 +55,10 @@ export async function askAssistant(messages, system) {
     throw new Error(data?.error || `Edge function failed (${res.status})`);
   }
 
-  // normalize to a plain string and also return the conversation id
   const content = normalizeContent(data.reply);
   return {
     content,
     conversationId: data.conversation_id || data.conversationId || null,
+    citations: data.citations || [],
   };
 }
