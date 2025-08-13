@@ -69,12 +69,10 @@ Code lives in supabase/functions/chat/index.ts (Deno). It:
 Deploy:
 supabase functions deploy chat --no-verify-jwt
 
-Set function secrets:
 supabase secrets set OPENAI_API_KEY=sk-...
 supabase secrets set SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 supabase secrets set SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
 
 
 
-
-![App Preview](https://github.com/user-attachments/assets/56e24d71-a50e-414f-9364-c005e84c7a70)
+![App Preview](https://github.com/user-attachments/assets/2c00d301-b697-4fc4-a080-9aa04bb3540b)
