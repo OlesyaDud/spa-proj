@@ -29,6 +29,145 @@ business_config — id=1, hours JSON, address, phone, email, policies JSON
 knowledge — id, embedding vector(1536), slug/title, chunk text, metadata
 conversations / messages — (optional) minimal chat history
 
+📁 Project Structure
+src/
+├── components/
+│   ├── BookingForm.jsx      # Appointment booking form
+│   ├── ChatWidget.jsx       # Main chat interface
+│   └── SoftSelect.jsx       # Service selection component
+├── bots/
+│   ├── CustomerServiceBot.jsx # Main bot logic
+│   └── FAQBot.jsx            # FAQ handling
+├── sections/
+│   ├── About.jsx
+│   ├── Services.jsx
+│   └── Hero.jsx
+├── utils/
+│   ├── aiChat.js            # OpenAI integration
+│   ├── saveBooking.js       # Google Sheets integration
+│   └── supabaseClient.js    # Database client
+└── data/
+    └── sections.js          # Page content
+
+
+🗄️ Database Schema
+Core Tables
+Services
+sqlcreate table public.services (
+  id text primary key,
+  name text not null,
+  duration integer not null,
+  price_from numeric not null,
+  description text not null
+);
+
+Business Configuration
+sqlcreate table public.business_config (
+  id integer primary key default 1,
+  name text,
+  phone text,
+  email text,
+  address text,
+  hours jsonb,
+  policies jsonb
+);
+
+
+Chat History
+sqlcreate table public.conversations (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now()
+);
+
+create table public.messages (
+  id bigserial primary key,
+  conversation_id uuid not null references public.conversations(id),
+  role text not null check (role in ('user','assistant')),
+  content text not null,
+  metadata jsonb not null default '{}',
+  created_at timestamptz not null default now()
+);
+
+
+Vector Knowledge Base (RAG)
+Enable Vector Extension
+sqlcreate extension if not exists vector;
+Knowledge Table
+sqlcreate table public.knowledge (
+  id uuid primary key default gen_random_uuid(),
+  slug text not null,            -- e.g. 'spa:service:hot-stone'
+  chunk text not null,           -- the actual content
+  metadata jsonb not null default '{}',
+  embedding vector(1536)         -- OpenAI embedding
+);
+
+Vector Index for Performance
+sqlcreate index idx_knowledge_embedding
+on public.knowledge
+using hnsw (embedding vector_cosine_ops)
+with (m = 16, ef_construction = 64);
+Similarity Search Function
+sqlcreate or replace function public.match_knowledge(
+  query_embedding vector(1536),
+  match_count int default 5,
+  similarity_threshold float default 0.60
+)
+returns table (
+  id uuid,
+  slug text,
+  chunk text,
+  metadata jsonb,
+  similarity float
+)
+language sql stable as $$
+  select
+    k.id,
+    k.slug,
+    k.chunk,
+    k.metadata,
+    1 - (k.embedding <=> query_embedding) as similarity
+  from public.knowledge k
+  where k.embedding is not null
+    and 1 - (k.embedding <=> query_embedding) > similarity_threshold
+  order by k.embedding <=> query_embedding
+  limit match_count;
+$$;
+
+
+🔍 Testing Vector Search
+Test Similarity Search
+sql-- Test with hours FAQ
+select * from public.match_knowledge(
+  (select embedding from public.knowledge
+   where slug = 'spa:faq:hours' limit 1),
+  5,    -- top 5 results
+  0.55  -- similarity threshold
+);
+
+-- Test with cancellation policy
+select * from public.match_knowledge(
+  (select embedding from public.knowledge 
+   where slug = 'spa:faq:cancellation' limit 1),
+  5, 0.55
+);
+
+-- Test with hot stone service
+select * from public.match_knowledge(
+  (select embedding from public.knowledge 
+   where slug = 'spa:services:hot-stone' limit 1),
+  5, 0.55
+);
+
+Diagnostic Queries
+sql-- Check embedding status
+select count(*) total, count(embedding) embedded 
+from public.knowledge;
+
+-- Verify index exists
+select relname from pg_class 
+where relname = 'idx_knowledge_embedding';
+
+
 RAG hits knowledge with pgvector similarity via an SQL RPC.
 
 🔎 RAG flow (in one breath)
@@ -40,11 +179,17 @@ Ask in the chat:
 “Tell me about Hot Stone Therapy.” → description pulled from knowledge
 “Do you sell gift cards?” → from knowledge
 
+
+2. Environment Variables
+Create .env.local:
+envVITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_anon_key
+VITE_OPENAI_API_KEY=your_openai_key
+
+
 🗒️ Bookings → Google Sheets (Apps Script)
 Apps Script (Web App → Anyone):
-
 const SHEET = 'Bookings';
-
 function doPost(e) {
   const data = JSON.parse(e.postData.contents || '{}');
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET) || SpreadsheetApp.getActive().insertSheet(SHEET);
@@ -72,6 +217,14 @@ supabase functions deploy chat --no-verify-jwt
 supabase secrets set OPENAI_API_KEY=sk-...
 supabase secrets set SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 supabase secrets set SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
+
+
+🤝 Contributing
+Fork the repository
+Create a feature branch
+Commit your changes
+Push to the branch
+Create a Pull Request
 
 
 
