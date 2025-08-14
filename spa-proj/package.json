@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "embed:recent": "node scripts/reembed-recent.mjs",
+    "embed:30": "node scripts/reembed-recent.mjs 30",
+    "embed:60": "node scripts/reembed-recent.mjs 60",
     "lint": "eslint .",
     "preview": "vite preview"
   },

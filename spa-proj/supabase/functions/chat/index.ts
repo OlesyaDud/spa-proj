@@ -256,13 +256,11 @@ serve(async (req) => {
 
     if (db) {
       try {
-        await db
-          .from("messages")
-          .insert({
-            conversation_id: convId,
-            role: "assistant",
-            content: reply.content ?? "",
-          });
+        await db.from("messages").insert({
+          conversation_id: convId,
+          role: "assistant",
+          content: reply.content ?? "",
+        });
       } catch (_) {}
     }
 

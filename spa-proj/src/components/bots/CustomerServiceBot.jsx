@@ -91,16 +91,32 @@ function ServiceDetails({ service, onBack, onBook }) {
 
 /* --------------------------- Matching helpers ------------------------ */
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const isPriceQ = (t = "") => /\b(price|cost|how much)\b/i.test(t);
 const isDurationQ = (t = "") => /\b(duration|how long)\b/i.test(t);
 const isDetailsQ = (t = "") =>
   /\b(details|what is|tell me more|include|about|explain|describe)\b/i.test(t);
-const isBookQ = (t = "") => /\b(book|schedule|reserve|appointment)\b/i.test(t);
 
+// prevent accidental booking when user says “don’t book”
+const isBookQ = (t = "") => {
+  const negated =
+    /\b(don'?t|do not|no|not)\s+(book|schedule|reserve|appointment)s?\b/i.test(
+      t
+    );
+  const positive = /\b(book|schedule|reserve|appointment)s?\b/i.test(t);
+  return positive && !negated;
+};
+
+// treat anything that reads like a question as a question
 const isQuestion = (t = "") =>
   /\?|^\s*(what|how|why|tell me|explain|describe|details|about|include)\b/i.test(
     String(t)
   );
+
+// matches hours-like wording so we can answer from business_config
+const isHoursLike = (t = "") =>
+  /\b(weekend|sat(urday)?|sun(day)?|hours?|open|close(d)?)\b/i.test(t);
 
 const slug = (s = "") =>
   String(s)
@@ -109,6 +125,7 @@ const slug = (s = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
+// simple alias map
 const SERVICE_ALIASES = {
   "hot stone": "hot stone therapy",
   "hot stones": "hot stone therapy",
@@ -127,6 +144,7 @@ const SERVICE_ALIASES = {
 function findServiceFromText(text, services) {
   const t = slug(text);
 
+  // alias hit
   for (const [alias, target] of Object.entries(SERVICE_ALIASES)) {
     if (t.includes(alias)) {
       const svc = services.find(
@@ -136,12 +154,14 @@ function findServiceFromText(text, services) {
     }
   }
 
+  // direct contains
   for (const s of services) {
     const id = slug(s.id);
     const nm = slug(s.name);
     if (t.includes(id) || t.includes(nm)) return s;
   }
 
+  // token overlap fallback
   let best = null;
   for (const s of services) {
     const tokens = slug(s.name).split(" ").filter(Boolean);
@@ -187,8 +207,26 @@ function answerLocation(biz) {
 function answerPolicy(biz) {
   const c = biz?.policies?.cancellation;
   if (c) return c;
-  // friendly fallback
   return "Please provide 24 hours notice to cancel or reschedule.";
+}
+
+/* ------------------- Suggestion “chips” (quick replies) --------------- */
+
+function Suggestions({ items, onPick }) {
+  if (!items?.length) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {items.map((label, i) => (
+        <button
+          key={`${label}-${i}`}
+          onClick={() => onPick(label)}
+          className="rounded-full border border-violet-200 bg-white/90 px-3 py-1.5 text-xs text-[#6f5aa3] hover:bg-violet-50"
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /* ----------------------------- Main Bot ------------------------------ */
@@ -203,18 +241,29 @@ export default function CustomerServiceBot() {
   ]);
   const [pending, setPending] = useState(false);
 
+  // conversation & data
   const [conversationId, setConversationId] = useState(null);
   const [services, setServices] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const [biz, setBiz] = useState(null);
 
+  // views/state
   const [showServiceMenu, setShowServiceMenu] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [showBooking, setShowBooking] = useState(false);
   const [currentService, setCurrentService] = useState(null);
 
+  // quick replies
+  const [suggestions, setSuggestions] = useState([
+    "Services",
+    "Saturday hours",
+    "Where are you located?",
+    "Gift cards",
+  ]);
+
   const scrollerRef = useRef(null);
 
+  // Load services + business config
   useEffect(() => {
     (async () => {
       try {
@@ -237,6 +286,7 @@ export default function CustomerServiceBot() {
     fetchBusinessConfig().then(setBiz).catch(console.error);
   }, []);
 
+  // Auto-scroll
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -246,6 +296,14 @@ export default function CustomerServiceBot() {
   }, [messages, pending, showServiceMenu, selectedService, showBooking]);
 
   const append = (msg) => setMessages((m) => [...m, msg]);
+
+  // soft “typing…” reply helper
+  const speak = useCallback(async (content, opts = { delay: 250 }) => {
+    setPending(true);
+    await sleep(opts.delay ?? 250);
+    append({ role: "bot", content });
+    setPending(false);
+  }, []);
 
   const backToChat = useCallback(() => {
     setShowBooking(false);
@@ -257,8 +315,10 @@ export default function CustomerServiceBot() {
       role: "bot",
       content: "Okay — back to the main chat. How can I help?",
     });
+    setSuggestions(["Services", "Prices", "Book an appointment"]);
   }, []);
 
+  // Esc closes booking
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape" && showBooking) backToChat();
@@ -271,6 +331,7 @@ export default function CustomerServiceBot() {
     setShowBooking(false);
     setSelectedService(null);
     setShowServiceMenu(true);
+    setSuggestions(["Back to chat"]);
   }, []);
 
   const toAI = (items) =>
@@ -283,6 +344,12 @@ export default function CustomerServiceBot() {
     setCurrentService(null);
     setSelectedService(null);
     setShowServiceMenu(true);
+    setSuggestions([
+      "Signature Massage",
+      "Hot Stone Therapy",
+      "Rejuvenating Facials",
+      "Back to chat",
+    ]);
   }, []);
 
   const closeServiceMenu = useCallback(() => {
@@ -292,16 +359,19 @@ export default function CustomerServiceBot() {
       role: "bot",
       content: "No problem — back to the main chat. How can I help?",
     });
+    setSuggestions(["Hours", "Location", "Book"]);
   }, []);
 
   const openDetails = useCallback((svc) => {
     setSelectedService(svc);
     setCurrentService(svc);
+    setSuggestions(["Price", "Duration", "Book", "Back"]);
   }, []);
 
   const backToServices = useCallback(() => {
     setSelectedService(null);
     setCurrentService(null);
+    setSuggestions(["Price list", "Duration", "Book", "Back to chat"]);
   }, []);
 
   const startBooking = useCallback(() => {
@@ -311,12 +381,14 @@ export default function CustomerServiceBot() {
       content:
         "Great! I'll collect a few details. Use the booking form below to continue.",
     });
+    setSuggestions(["Back to services", "Back to chat"]);
   }, []);
 
+  /** Dynamic system prompt (includes focused service if present). */
   const buildSystemPrompt = useCallback(() => {
     return `You are a friendly spa assistant. Be concise and helpful.
-Only offer the services menu if the user explicitly asks for "services".
 If a current service is provided, use it to answer follow-ups directly.
+Only answer using the provided context; if you can't find the answer, say you don't know and recommend contacting the spa.
 
 ${
   currentService
@@ -329,6 +401,7 @@ ${
 }`;
   }, [currentService]);
 
+  /** Single place to call the edge function and append the reply. */
   const callAI = useCallback(
     async (userText) => {
       setPending(true);
@@ -339,95 +412,92 @@ ${
         ];
         const system = buildSystemPrompt();
 
-        let res;
-        try {
-          res = await askAssistant(history, system, {
-            topK: 8,
-            threshold: 0.55,
-          });
-        } catch {
-          res = await askAssistant(history, system, conversationId);
-        }
+        const res = await askAssistant(history, system, {
+          topK: 8,
+          threshold: 0.45, // a little looser for short FAQs like “gift cards”
+        });
 
-        const reply = res?.reply ?? res; // support both shapes (utils returning {reply} or raw)
         const content =
-          reply?.content ||
-          reply?.message ||
-          reply?.text ||
-          (typeof reply === "string" ? reply : "");
+          res?.content ||
+          (res?.reply?.content ?? res?.reply?.text) ||
+          (typeof res === "string" ? res : "");
 
-        if (res?.conversation_id && res.conversation_id !== conversationId) {
-          setConversationId(res.conversation_id);
+        if (res?.conversationId && res.conversationId !== conversationId) {
+          setConversationId(res.conversationId);
         }
 
+        // soft typing effect
+        await sleep(200);
         append({ role: "bot", content: String(content || "…").trim() });
 
-        // If you kept citations, show them; else they won’t appear.
-        if (Array.isArray(res?.citations) && res.citations.length) {
-          const tips = res.citations
-            .map(
-              (c) =>
-                `• ${c.title || c.slug || "kb"} (${(c.similarity * 100).toFixed(
-                  0
-                )}% match)`
-            )
-            .join("\n");
-          append({ role: "bot", content: `_Sources:_\n${tips}` });
-        }
+        // gentle follow-ups
+        setSuggestions([
+          currentService ? "Book" : "Services",
+          "Prices",
+          "Hours",
+          "Location",
+        ]);
       } catch (e) {
-        console.error(e);
-        append({
-          role: "bot",
-          content:
-            "Sorry, I had trouble answering that just now. Please try again.",
-        });
+        console.error("AI call failed:", e);
+        await speak(
+          "Hmm, I couldn't reach the assistant right now. Want me to try again?",
+          { delay: 80 }
+        );
+        setSuggestions(["Try again", "Services", "Hours"]);
       } finally {
         setPending(false);
       }
     },
-    [messages, conversationId, buildSystemPrompt]
+    [messages, conversationId, buildSystemPrompt, currentService, speak]
   );
 
-  /* ------------------------ THE IMPORTANT CHANGE -----------------------
-     Handle specific intents from business_config BEFORE the generic
-     "question → AI" branch. This prevents hours/location questions from
-     skipping your DB answers.
-  --------------------------------------------------------------------- */
+  /* ------------------------------- Send ------------------------------- */
 
   const handleSend = useCallback(
     async (raw) => {
       const text = String(raw || "").trim();
       if (!text || pending) return;
 
-      if (/(^|\s)(back|close|exit|main menu|cancel)($|\s)/i.test(text)) {
+      // Quick “chip” actions use simple phrases. Normalize a few:
+      const lower = text.toLowerCase();
+      const normalized =
+        lower === "try again"
+          ? messages.slice(-1).find((m) => m.role === "user")?.content || "Hi"
+          : text;
+
+      // quick escape to main chat
+      if (/(^|\s)(back|close|exit|main menu|cancel)($|\s)/i.test(normalized)) {
         backToChat();
         return;
       }
 
-      append({ role: "user", content: text });
+      append({ role: "user", content: normalized });
 
-      const intent = detectIntent(text);
-      const maybeService = findServiceFromText(text, services);
+      const intent = detectIntent(normalized);
+      const maybeService = findServiceFromText(normalized, services);
 
-      // 1) PRIORITIZE business_config intents
-      if (intent === "hours") {
-        const ans = answerHours(text, biz);
+      // 1) PRIORITIZE business_config intents (hours/location/policy)
+      if (intent === "hours" || isHoursLike(normalized)) {
+        const ans = answerHours(normalized, biz);
         if (ans) {
-          append({ role: "bot", content: ans });
+          await speak(ans);
+          setSuggestions(["Location", "Services", "Book"]);
           return;
         }
       }
       if (intent === "location") {
         const ans = answerLocation(biz);
         if (ans) {
-          append({ role: "bot", content: ans });
+          await speak(ans);
+          setSuggestions(["Hours", "Services", "Book"]);
           return;
         }
       }
       if (intent === "policy") {
         const ans = answerPolicy(biz);
         if (ans) {
-          append({ role: "bot", content: ans });
+          await speak(ans);
+          setSuggestions(["Services", "Book", "Hours"]);
           return;
         }
       }
@@ -437,70 +507,72 @@ ${
         setShowServiceMenu(false);
         setSelectedService(maybeService);
         setCurrentService(maybeService);
-        append({
-          role: "bot",
-          content: `Here are the details for **${maybeService.name}**.`,
-        });
+        await speak(
+          `${summarizeService(
+            maybeService
+          )} Would you like to book it or see the service card?`
+        );
+        setSuggestions(["Book", "Price", "Duration", "Back"]);
         return;
       }
 
       // 3) Generic Q&A → AI/RAG
-      const question = isQuestion(text);
+      const question = isQuestion(normalized);
       if (question) {
         setShowServiceMenu(false);
         setSelectedService(null);
-        await callAI(text);
+        await callAI(normalized);
         return;
       }
 
       // 4) Non-question small intents
       if (intent === "greeting") {
-        append({
-          role: "bot",
-          content:
-            "Welcome! I can show services, explain pricing, or start a booking — what would you like?",
-        });
+        await speak(
+          "Welcome! I can show services, explain pricing, or start a booking — what would you like?"
+        );
+        setSuggestions(["Services", "Prices", "Book"]);
         return;
       }
-      if (intent === "book") {
+      if (intent === "book" && isBookQ(normalized)) {
         if (currentService) setSelectedService(currentService);
         startBooking();
         return;
       }
 
-      if (/services?/.test(text.toLowerCase())) {
+      if (/^services?$/i.test(normalized)) {
         if (!loadingServices && services.length > 0) {
+          await speak("Here are our services — tap one to see details.");
           openServiceMenu();
         } else {
-          append({
-            role: "bot",
-            content:
-              "I’m still loading our services list—try again in a moment.",
-          });
+          await speak(
+            "I’m still loading our services list—try again in a moment."
+          );
         }
         return;
       }
 
+      // 5) If a service is in focus, answer quick structured questions
       if (currentService) {
-        if (isPriceQ(text)) {
-          append({
-            role: "bot",
-            content: `${currentService.name} starts at $${currentService.priceFrom}. Would you like to book or hear more details?`,
-          });
+        if (isPriceQ(normalized)) {
+          await speak(
+            `${currentService.name} starts at $${currentService.priceFrom}. Want to book or hear more details?`
+          );
+          setSuggestions(["Book", "Details", "Back"]);
           return;
         }
-        if (isDurationQ(text)) {
-          append({
-            role: "bot",
-            content: `${currentService.name} lasts about ${currentService.duration} minutes. Want to book it?`,
-          });
+        if (isDurationQ(normalized)) {
+          await speak(
+            `${currentService.name} lasts about ${currentService.duration} minutes. Want to book it?`
+          );
+          setSuggestions(["Book", "Back"]);
           return;
         }
-        if (isDetailsQ(text)) {
-          append({ role: "bot", content: summarizeService(currentService) });
+        if (isDetailsQ(normalized)) {
+          await speak(summarizeService(currentService));
+          setSuggestions(["Book", "Price", "Duration", "Back"]);
           return;
         }
-        if (isBookQ(text)) {
+        if (isBookQ(normalized)) {
           setSelectedService(currentService);
           startBooking();
           return;
@@ -510,11 +582,11 @@ ${
       // Fallback to AI
       setShowServiceMenu(false);
       setSelectedService(null);
-      await callAI(text);
+      await callAI(normalized);
     },
     [
-      messages,
       pending,
+      messages,
       services,
       loadingServices,
       biz,
@@ -523,6 +595,7 @@ ${
       openServiceMenu,
       startBooking,
       callAI,
+      speak,
     ]
   );
 
@@ -535,6 +608,7 @@ ${
       ? formatDate(new Date(payload.date))
       : "(date TBD)";
 
+    // short transcript
     const transcript = messages
       .slice(-8)
       .map((m) => `${m.role === "bot" ? "assistant" : "user"}: ${m.content}`)
@@ -556,29 +630,37 @@ ${
       console.error("saveBooking failed:", err);
     }
 
-    append({
-      role: "bot",
-      content: `Thanks, ${payload.name || "friend"}! I’ve sent your ${
+    await speak(
+      `Thanks, ${payload.name || "friend"}! I’ve sent your ${
         s?.name || "service"
       } request for ${when}. We'll confirm via email (${
         payload.email || "n/a"
       }) or phone (${payload.phone || "n/a"}).`,
-    });
+      { delay: 100 }
+    );
 
     setShowBooking(false);
     setSelectedService(null);
     setShowServiceMenu(false);
     setCurrentService(null);
+    setSuggestions(["Services", "Another booking", "Hours"]);
+  };
+
+  // Quick-reply handler
+  const onPickSuggestion = (label) => {
+    handleSend(label);
   };
 
   return (
     <div className="h-full flex flex-col gap-3">
+      {/* Scrollable messages */}
       <div
         ref={scrollerRef}
         className="flex-1 overflow-y-auto rounded-2xl bg-white/80 p-3 ring-1 ring-violet-100"
       >
         <MessageList items={messages} />
 
+        {/* Menus / Details */}
         {showServiceMenu && !selectedService && (
           <div className="mt-3">
             <ServiceMenu
@@ -606,6 +688,10 @@ ${
         )}
       </div>
 
+      {/* Quick-reply chips */}
+      <Suggestions items={suggestions} onPick={onPickSuggestion} />
+
+      {/* Booking form */}
       {showBooking && (
         <div className="rounded-2xl bg-white/95 p-4 ring-1 ring-violet-100 shadow-[0_12px_30px_-18px_rgba(139,92,246,0.25)]">
           <div className="mb-2 flex items-center justify-between">
@@ -637,12 +723,13 @@ ${
         </div>
       )}
 
+      {/* Input */}
       <div className="flex-shrink-0">
         <ChatInput
           onSend={handleSend}
           disabled={pending}
           placeholder={
-            pending ? "Thinking…" : "Say “services” or ask about one by name…"
+            pending ? "Thinking…" : "Ask about hours, services, or bookings…"
           }
         />
       </div>
